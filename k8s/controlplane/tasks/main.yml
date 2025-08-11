@@ -1,0 +1,5 @@
+- name: Download kubeadm binary
+  ansible.builtin.get_url:
+    url: 
+    dest: /bin/kubeadm
+    mode: '0555'

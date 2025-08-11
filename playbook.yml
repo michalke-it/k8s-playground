@@ -1,0 +1,8 @@
+- name: Kubernetes Installer
+  hosts: headnodes
+  gather_facts: true
+  vars:
+    k8s_version: 1.31.11
+  tasks:
+    - ansible.builtin.include_role:
+        name: k8s/controlplane
