@@ -2,9 +2,11 @@
 # vi: set ft=ruby :
 
 #require_relative 'environment.rb'
-#include Variables
+module Variables
+    $NODE_COUNT = 3
+end
+include Variables
 
-# ENV['VAGRANT_NO_PARALLEL'] = 'yes'
 Vagrant.configure("2") do |config|
 #  config.vm.provider "libvirt"
 #  config.hostmanager.enabled = true
@@ -13,7 +15,7 @@ Vagrant.configure("2") do |config|
 #  config.hostmanager.ignore_private_ip = false
 #  config.hostmanager.include_offline = true
 
-  (1..3).each do |i|
+  (1..$NODE_COUNT).each do |i|
     config.vm.define "node#{i}" do |worker|
       worker.vm.box = "generic/ubuntu2204"
       worker.vm.hostname = "node#{i}"
@@ -27,7 +29,16 @@ Vagrant.configure("2") do |config|
         v.customize ["modifyvm", :id, "--memory", "4096"]
         v.customize ["modifyvm", :id, "--cpus", "2"]
       end
-      if i == 3
+      worker.vm.provision :shell,
+        inline: "sudo swapoff -a && \
+        sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1 && \
+        sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1 && \
+        sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1 && \
+        sudo sysctl -w net.ipv4.ip_forward=1 && \
+        sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install containerd conntrack -y && \
+        echo '192.168.40.4#{$NODE_COUNT}' | sudo tee /tmp/vars && \
+        echo 'nameserver 192.168.40.4#{i}' | sudo tee /etc/kubeadm-resolv.conf"
+      if i == $NODE_COUNT
         worker.vm.provision :ansible do |ansible|
           # Disable default limit to connect to all the machines
           ansible.limit = "all"

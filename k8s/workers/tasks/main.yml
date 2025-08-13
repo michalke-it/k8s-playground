@@ -1,0 +1,73 @@
+- name: Download kubelet binary
+  ansible.builtin.get_url:
+    url: https://dl.k8s.io/release/{{ kubernetes.version }}/bin/linux/{{ kubernetes.arch }}/kubelet
+    dest: /usr/local/bin/kubelet
+    mode: '0555'
+
+- name: Download kubeadm binary
+  ansible.builtin.get_url:
+    url: https://dl.k8s.io/release/{{ kubernetes.version }}/bin/linux/{{ kubernetes.arch }}/kubeadm
+    dest: /usr/local/bin/kubeadm
+    mode: '0555'
+
+- name: Download kubelet binary
+  ansible.builtin.get_url:
+    url: https://dl.k8s.io/release/{{ kubernetes.version }}/bin/linux/{{ kubernetes.arch }}/kubelet
+    dest: /usr/local/bin/kubelet
+    mode: '0555'
+
+- name: Download cni-plugins binary
+  ansible.builtin.get_url:
+    url: https://github.com/containernetworking/plugins/releases/download/{{ kubernetes.cni.version }}/cni-plugins-linux-{{ kubernetes.arch }}-{{ kubernetes.cni.version }}.tgz 
+    dest: /tmp/cni-plugins.tgz
+    mode: '0555'
+
+- name: Create a directory if it does not exist
+  ansible.builtin.file:
+    path: "{{ kubernetes.cni.destination }}"
+    state: directory
+    mode: '0755'
+
+- name: Extract kubeadm
+  shell: 
+    cmd: tar xvfz /tmp/cni-plugins.tgz -C {{ kubernetes.cni.destination }}
+
+- name: Create kubelet service
+  shell: 
+    cmd: curl -sSL "https://raw.githubusercontent.com/kubernetes/release/{{ kubernetes.release_version }}/cmd/krel/templates/latest/kubelet/kubelet.service" | sed "s:/usr/bin:/usr/local/bin:g" | sudo tee /usr/lib/systemd/system/kubelet.service
+
+- name: Configure kubelet service
+  shell: 
+    cmd: mkdir -p /usr/lib/systemd/system/kubelet.service.d && curl -sSL "https://raw.githubusercontent.com/kubernetes/release/{{ kubernetes.release_version }}/cmd/krel/templates/latest/kubeadm/10-kubeadm.conf" | sed "s:/usr/bin/kubelet:/usr/local/bin/kubelet:g" | sudo tee /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+- name: Activate kubelet service
+  ansible.builtin.systemd_service:
+    name: kubelet.service
+    state: started
+    enabled: true
+
+- name: Join cluster
+  shell: 
+    cmd: sh -c "{{ hostvars[groups["headnodes"][0]].joincmd.stdout }}"
+  register: output
+
+- name: Wait until config file got created
+  stat:
+    path: ls -lrt /var/lib/kubelet/config.yaml
+  register: lsresult
+  until: "lsresult is not failed"
+  retries: 10
+  delay: 5
+
+- name: Set separate resolv.conf file for DNS
+  shell: 
+    cmd: sed -i "s:/etc/kubeadm-resolv.conf:/etc/kubeadm-resolv.conf:g" /var/lib/kubelet/config.yaml
+
+- name: Restart kubelet service
+  ansible.builtin.systemd_service:
+    name: kubelet.service
+    state: restarted
+
+- name: Showing output of the joining
+  debug: 
+    var: output.stdout_lines

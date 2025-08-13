@@ -1,0 +1,7 @@
+kubernetes:
+  version: v1.31.11
+  release_version: v0.16.2
+  arch: amd64
+  cni:
+    version: v1.3.0
+    destination: /opt/cni/bin

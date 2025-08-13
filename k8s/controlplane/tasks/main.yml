@@ -1,5 +1,93 @@
+- name: Download cni-plugins binary
+  ansible.builtin.get_url:
+    url: https://github.com/containernetworking/plugins/releases/download/{{ kubernetes.cni.version }}/cni-plugins-linux-{{ kubernetes.arch }}-{{ kubernetes.cni.version }}.tgz 
+    dest: /tmp/cni-plugins.tgz
+    mode: '0555'
+
+- name: Create a directory if it does not exist
+  ansible.builtin.file:
+    path: "{{ kubernetes.cni.destination }}"
+    state: directory
+    mode: '0755'
+
+- name: Extract kubeadm
+  shell: 
+    cmd: tar xvfz /tmp/cni-plugins.tgz -C {{ kubernetes.cni.destination }}
+
 - name: Download kubeadm binary
   ansible.builtin.get_url:
-    url: 
-    dest: /bin/kubeadm
+    url: https://dl.k8s.io/release/{{ kubernetes.version }}/bin/linux/{{ kubernetes.arch }}/kubeadm
+    dest: /usr/local/bin/kubeadm
     mode: '0555'
+
+- name: Download kubectl binary
+  ansible.builtin.get_url:
+    url: https://dl.k8s.io/release/{{ kubernetes.version }}/bin/linux/{{ kubernetes.arch }}/kubectl
+    dest: /usr/local/bin/kubectl
+    mode: '0555'
+
+- name: Download kubelet binary
+  ansible.builtin.get_url:
+    url: https://dl.k8s.io/release/{{ kubernetes.version }}/bin/linux/{{ kubernetes.arch }}/kubelet
+    dest: /usr/local/bin/kubelet
+    mode: '0555'
+
+- name: Create kubelet service
+  shell: 
+    cmd: curl -sSL "https://raw.githubusercontent.com/kubernetes/release/{{ kubernetes.release_version }}/cmd/krel/templates/latest/kubelet/kubelet.service" | sed "s:/usr/bin/kubelet:/usr/local/bin/kubelet:g" | sudo tee /usr/lib/systemd/system/kubelet.service
+
+- name: Configure kubelet service
+  shell: 
+    cmd: mkdir -p /usr/lib/systemd/system/kubelet.service.d && curl -sSL "https://raw.githubusercontent.com/kubernetes/release/{{ kubernetes.release_version }}/cmd/krel/templates/latest/kubeadm/10-kubeadm.conf" | sed "s:/usr/bin/kubelet:/usr/local/bin/kubelet:g" | sudo tee /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+- name: Activate kubelet service
+  ansible.builtin.systemd_service:
+    name: kubelet.service
+    state: started
+    enabled: true
+
+# Note: this prevents later HA conversion, see https://v1-31.docs.kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#considerations-about-apiserver-advertise-address-and-controlplaneendpoint
+- name: initialize control plane
+  shell:
+    cmd: kubeadm init --apiserver-advertise-address {{ controlplaneIP.stdout_lines[0] }} --pod-network-cidr 10.244.0.0/16
+  register: output
+
+- name: Showing output of the initialization
+  debug: 
+    var: output.stdout_lines
+
+- name: Read connection string
+  shell: 
+    cmd: echo {{ output.stdout_lines[73] }} {{ output.stdout_lines[74] }}
+  register: joincmd
+
+- name: Check connection string
+  debug: 
+    var: joincmd.stdout
+
+- name: Wait for api server to be available
+  wait_for: host=localhost port=6443 timeout=30
+
+- name: Wait until config file got created
+  stat:
+    path: ls -lrt /var/lib/kubelet/config.yaml
+  register: lsresult
+  until: "lsresult is not failed"
+  retries: 10
+  delay: 5
+
+- name: Set separate resolv.conf file for DNS
+  shell: 
+    cmd: sed -i "s:/etc/kubeadm-resolv.conf:/etc/kubeadm-resolv.conf:g" /var/lib/kubelet/config.yaml
+
+- name: Restart kubelet service
+  ansible.builtin.systemd_service:
+    name: kubelet.service
+    state: restarted
+
+# Note: we do not copy the kubeconfig to the user account here, so all kubectl commands have to be run via sudo
+- name: Copying kubeconfig to home directory (of root)
+  shell: 
+    cmd: mkdir -p $HOME/.kube && cp -i /etc/kubernetes/admin.conf $HOME/.kube/config && chown $(id -u):$(id -g) $HOME/.kube/config
+
+# kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml

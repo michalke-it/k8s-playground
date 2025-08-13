@@ -1,8 +1,27 @@
-- name: Kubernetes Installer
-  hosts: headnodes
+- name: Kubernetes Control Plane Installation
+  hosts: headnodes[0]
   gather_facts: true
-  vars:
-    k8s_version: 1.31.11
+  become: true
   tasks:
+    - name: Register the controlplane IP
+      ansible.builtin.shell: "cat /tmp/vars"
+      register: controlplaneIP
     - ansible.builtin.include_role:
         name: k8s/controlplane
+
+- name: Kubernetes Worker Installation
+  hosts: workers
+  gather_facts: true
+  become: true
+  tasks:
+    - ansible.builtin.include_role:
+        name: k8s/workers
+
+- name: Install CNI
+  hosts: headnodes[0]
+  gather_facts: true
+  become: true
+  tasks:
+    - ansible.builtin.include_role:
+        name: k8s/canal
+#        name: k8s/flannel

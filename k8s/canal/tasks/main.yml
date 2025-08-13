@@ -1,0 +1,8 @@
+- name: Install Canal
+  shell: 
+    cmd: kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/canal.yaml
+  register: output
+
+- name: Show command result
+  debug: 
+    var: output.stdout
