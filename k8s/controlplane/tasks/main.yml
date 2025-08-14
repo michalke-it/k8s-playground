@@ -68,23 +68,6 @@
 - name: Wait for api server to be available
   wait_for: host=localhost port=6443 timeout=30
 
-- name: Wait until config file got created
-  stat:
-    path: ls -lrt /var/lib/kubelet/config.yaml
-  register: lsresult
-  until: "lsresult is not failed"
-  retries: 10
-  delay: 5
-
-- name: Set separate resolv.conf file for DNS
-  shell: 
-    cmd: sed -i "s:/etc/kubeadm-resolv.conf:/etc/kubeadm-resolv.conf:g" /var/lib/kubelet/config.yaml
-
-- name: Restart kubelet service
-  ansible.builtin.systemd_service:
-    name: kubelet.service
-    state: restarted
-
 # Note: we do not copy the kubeconfig to the user account here, so all kubectl commands have to be run via sudo
 - name: Copying kubeconfig to home directory (of root)
   shell: 

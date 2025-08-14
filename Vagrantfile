@@ -6,6 +6,7 @@ module Variables
     $NODE_COUNT = 3
     $NODE_MEM = 4096
     $NODE_CPU = 2
+    $CRIO_VERSION = "v1.31"
 end
 include Variables
 
@@ -37,9 +38,18 @@ Vagrant.configure("2") do |config|
         sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1 && \
         sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1 && \
         sudo sysctl -w net.ipv4.ip_forward=1 && \
-        sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install containerd conntrack -y && \
+        sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install \
+        software-properties-common curl apt-transport-https ca-certificates conntrack gpg -y && \
         echo '192.168.40.4#{$NODE_COUNT}' | sudo tee /tmp/vars && \
-        echo 'nameserver 192.168.40.4#{i}' | sudo tee /etc/kubeadm-resolv.conf"
+        echo 'nameserver 192.168.40.4#{i}' | sudo tee /etc/kubeadm-resolv.conf && \
+        sudo sysctl --system && \
+        curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/stable:/#{$CRIO_VERSION}/deb/Release.key | \
+        gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg && \
+        echo 'deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/stable:/#{$CRIO_VERSION}/deb/ /' | \
+        tee /etc/apt/sources.list.d/cri-o.list && \
+        sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y cri-o && \
+        sudo systemctl daemon-reload && \
+        sudo systemctl enable crio --now"
       if i == $NODE_COUNT
         worker.vm.provision :ansible do |ansible|
           # Disable default limit to connect to all the machines
