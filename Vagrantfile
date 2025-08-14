@@ -4,6 +4,8 @@
 #require_relative 'environment.rb'
 module Variables
     $NODE_COUNT = 3
+    $NODE_MEM = 4096
+    $NODE_CPU = 2
 end
 include Variables
 
@@ -26,8 +28,8 @@ Vagrant.configure("2") do |config|
         v1.cpus = "2"
       end
       worker.vm.provider "virtualbox" do |v|
-        v.customize ["modifyvm", :id, "--memory", "4096"]
-        v.customize ["modifyvm", :id, "--cpus", "2"]
+        v.customize ["modifyvm", :id, "--memory", "#{$NODE_MEM}"]
+        v.customize ["modifyvm", :id, "--cpus", "#{$NODE_CPU}"]
       end
       worker.vm.provision :shell,
         inline: "sudo swapoff -a && \
