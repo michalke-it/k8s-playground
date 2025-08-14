@@ -41,14 +41,11 @@ Vagrant.configure("2") do |config|
         sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install \
         software-properties-common curl apt-transport-https ca-certificates conntrack gpg -y && \
         echo '192.168.40.4#{$NODE_COUNT}' | sudo tee /tmp/vars && \
-        echo 'nameserver 192.168.40.4#{i}' | sudo tee /etc/kubeadm-resolv.conf && \
-        sudo sysctl --system && \
         curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/stable:/#{$CRIO_VERSION}/deb/Release.key | \
         gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg && \
         echo 'deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/stable:/#{$CRIO_VERSION}/deb/ /' | \
         tee /etc/apt/sources.list.d/cri-o.list && \
         sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y cri-o && \
-        sudo systemctl daemon-reload && \
         sudo systemctl enable crio --now"
       if i == $NODE_COUNT
         worker.vm.provision :ansible do |ansible|
