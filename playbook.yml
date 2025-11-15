@@ -6,6 +6,7 @@
     - name: Register the controlplane IP
       ansible.builtin.shell: "cat /tmp/vars"
       register: controlplaneIP
+
     - ansible.builtin.include_role:
         name: k8s/controlplane
 
@@ -25,3 +26,6 @@
     - ansible.builtin.include_role:
         name: k8s/canal
 #        name: k8s/flannel
+
+    - ansible.builtin.include_role:
+        name: k8s/metrics-server

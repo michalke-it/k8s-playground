@@ -1,6 +1,9 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
+# Fix Vagrant plugin problems with:
+# export VAGRANT_DISABLE_STRICT_DEPENDENCY_ENFORCEMENT=1
+# vagrant plugin install vagrant-libvirt
 #require_relative 'environment.rb'
 module Variables
     $NODE_COUNT = 3
