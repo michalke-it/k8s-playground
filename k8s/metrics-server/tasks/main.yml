@@ -1,7 +1,16 @@
 - name: Install Metrics Server
   shell: 
-    cmd: kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+    cmd: curl -SLs https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml | sed '/--kubelet-preferred-address-types/a\        - --kubelet-insecure-tls' > /tmp/metrics-server.yaml 
+
+- name: Install Metrics Server
+  shell: 
+    cmd: kubectl apply -f /tmp/metrics-server.yaml
   register: output
+
+- name: Remove metrics-server definition
+  ansible.builtin.file:
+    path: /tmp/metrics-server.yaml
+    state: absent
 
 - name: Show command result
   debug: 
